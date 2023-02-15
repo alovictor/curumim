@@ -8,7 +8,7 @@ pub struct Line {
 }
 
 impl Line {
-    fn new(start: usize, end: usize, idx: usize) -> Self {
+    pub fn new(start: usize, end: usize, idx: usize) -> Self {
         Self { start, end, idx }
     }
 

@@ -35,7 +35,7 @@ impl Editor {
             quit: false,
             cursor: Position::from_rect(&edit),
             offset: Position::default(),
-            current_line: document.get_line(0).unwrap().clone(),
+            current_line: Line::new(0, 0, 0),
             document,
             edit,
             term,
@@ -67,7 +67,7 @@ impl Editor {
 
     fn process_keys(&mut self) {
         let key = self.term.get_input().unwrap();
-        let pad = self.edit.tl.x;
+        let pad = self.edit.tl.x.clone();
 
         match key.modifiers {
             KeyModifiers::CONTROL => {
@@ -85,7 +85,7 @@ impl Editor {
                     }
                 }
                 Key::Down => {
-                    if self.cursor.y < self.edit.br.y {
+                    if self.cursor.y < self.edit.br.y - 1 {
                         self.cursor.y += 1
                     }
                     if self.cursor.x > pad + self.document.get_line(self.cursor.y).unwrap().len() {
@@ -95,11 +95,17 @@ impl Editor {
                 Key::Left => {
                     if self.cursor.x > self.edit.tl.x {
                         self.cursor.x -= 1;
+                    } else if self.cursor.y > 0 {
+                        self.cursor.y -= 1;
+                        self.cursor.x = pad + self.document.get_line(self.cursor.y).unwrap().len()
                     }
                 }
                 Key::Right => {
                     if self.cursor.x < pad + self.current_line.len() {
                         self.cursor.x += 1;
+                    } else if self.cursor.y < self.edit.br.y {
+                        self.cursor.y += 1;
+                        self.cursor.x = pad
                     }
                 }
                 Key::Home => self.cursor.x = self.edit.tl.x,
@@ -109,7 +115,7 @@ impl Editor {
                     self.cursor.x = self.edit.tl.x;
                 }
                 Key::PageDown => {
-                    self.cursor.y = min(self.edit.br.y - 1, self.document.len() - 1);
+                    self.cursor.y = min(self.edit.br.y, self.document.len() - 1);
                     self.cursor.x = self.edit.tl.x;
                 }
                 // Key::Char(c) => self.document.insert_char(c, &self.cursor).unwrap(),
@@ -128,8 +134,8 @@ impl Editor {
     }
 
     fn scroll(&mut self) {
-        if self.cursor.y < self.offset.y {
-            self.offset.y = self.cursor.y;
+        if self.cursor.y == self.edit.br.y {
+            self.offset.y = self.cursor.y - self.edit.br.y
         }
         // else if y >= offset.y.saturating_add(height) {
         //     offset.y = y.saturating_sub(height).saturating_add(1);
@@ -137,7 +143,7 @@ impl Editor {
     }
 
     fn draw_edit(&mut self) {
-        for line in 0..self.edit.br.y {
+        for line in self.offset.y..self.edit.br.y + 1 {
             if let Some(string) = self.document.get_str_line(line) {
                 self.draw_row(
                     &Position {
@@ -163,9 +169,10 @@ impl Editor {
         }
         status = format!("{}", filename);
         let line_indicator = format!(
-            "{:?}/{}/{}",
+            "{:?} / {:?} / {} / {}",
+            self.offset,
             self.cursor,
-            self.current_line.index(),
+            self.edit.br.y,
             self.document.len()
         );
         let len = status.len() + line_indicator.len();
