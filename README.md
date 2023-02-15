@@ -4,8 +4,8 @@
 
 ## Backlog
 
-- rolagem de pagina funcionando
-- inserção de texto
+- rolagem de pagina funcionando :white_check_mark:
+- inserção de texto 
 - salvar arquivos
 - pesquisa
 - atalhos de teclado
