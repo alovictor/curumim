@@ -17,6 +17,7 @@ pub struct Term {
 }
 
 impl Term {
+    #[must_use]
     pub fn new(mut out: Stdout) -> Self {
         execute!(out, terminal::EnterAlternateScreen).unwrap();
         if !terminal::is_raw_mode_enabled().unwrap() {
@@ -32,6 +33,7 @@ impl Term {
         }
     }
 
+    #[must_use]
     pub fn size(&self) -> &Size {
         &self.size
     }

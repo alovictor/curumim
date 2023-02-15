@@ -20,7 +20,7 @@ impl Editor {
         let args: Vec<String> = env::args().collect();
         let document = if args.len() > 1 {
             let file_name = &args[1];
-            Document::open(&file_name).unwrap_or_default()
+            Document::open(file_name).unwrap_or_default()
         } else {
             Document::default()
         };
@@ -67,7 +67,7 @@ impl Editor {
 
     fn process_keys(&mut self) {
         let key = self.term.get_input().unwrap();
-        let pad = self.edit.tl.x.clone();
+        let pad = self.edit.tl.x;
 
         match key.modifiers {
             KeyModifiers::CONTROL => {
@@ -81,15 +81,15 @@ impl Editor {
                         self.cursor.y -= 1;
                     }
                     if self.cursor.x > pad + self.document.get_line(self.cursor.y).unwrap().len() {
-                        self.cursor.x = pad + self.document.get_line(self.cursor.y).unwrap().len()
+                        self.cursor.x = pad + self.document.get_line(self.cursor.y).unwrap().len();
                     }
                 }
                 Key::Down => {
                     if self.cursor.y < self.edit.br.y - 1 {
-                        self.cursor.y += 1
+                        self.cursor.y += 1;
                     }
                     if self.cursor.x > pad + self.document.get_line(self.cursor.y).unwrap().len() {
-                        self.cursor.x = pad + self.document.get_line(self.cursor.y).unwrap().len()
+                        self.cursor.x = pad + self.document.get_line(self.cursor.y).unwrap().len();
                     }
                 }
                 Key::Left => {
@@ -97,7 +97,7 @@ impl Editor {
                         self.cursor.x -= 1;
                     } else if self.cursor.y > 0 {
                         self.cursor.y -= 1;
-                        self.cursor.x = pad + self.document.get_line(self.cursor.y).unwrap().len()
+                        self.cursor.x = pad + self.document.get_line(self.cursor.y).unwrap().len();
                     }
                 }
                 Key::Right => {
@@ -105,7 +105,7 @@ impl Editor {
                         self.cursor.x += 1;
                     } else if self.cursor.y < self.edit.br.y {
                         self.cursor.y += 1;
-                        self.cursor.x = pad
+                        self.cursor.x = pad;
                     }
                 }
                 Key::Home => self.cursor.x = self.edit.tl.x,
@@ -122,20 +122,20 @@ impl Editor {
                 _ => (),
             },
             _ => (),
-        }
+        };
     }
 
     fn update(&mut self) {
         self.current_line = self.document.get_line(self.cursor.y).unwrap();
 
         if !self.cursor.in_range(&self.edit) {
-            self.cursor = Position::from_rect(&self.edit)
+            self.cursor = Position::from_rect(&self.edit);
         }
     }
 
     fn scroll(&mut self) {
         if self.cursor.y == self.edit.br.y {
-            self.offset.y = self.cursor.y - self.edit.br.y
+            self.offset.y = self.cursor.y - self.edit.br.y;
         }
         // else if y >= offset.y.saturating_add(height) {
         //     offset.y = y.saturating_sub(height).saturating_add(1);
@@ -143,7 +143,7 @@ impl Editor {
     }
 
     fn draw_edit(&mut self) {
-        for line in self.offset.y..self.edit.br.y + 1 {
+        for line in self.offset.y..=self.edit.br.y {
             if let Some(string) = self.document.get_str_line(line) {
                 self.draw_row(
                     &Position {
@@ -157,7 +157,7 @@ impl Editor {
     }
 
     fn draw_row(&mut self, pos: &Position, string: String) {
-        self.term.write_line(pos, string, self.cursor.clone())
+        self.term.write_line(pos, string, self.cursor);
     }
 
     fn draw_bar(&mut self) {
@@ -167,7 +167,7 @@ impl Editor {
             filename = name.clone();
             filename.truncate(20);
         }
-        status = format!("{}", filename);
+        status = filename.to_string();
         let line_indicator = format!(
             "{:?} / {:?} / {} / {}",
             self.offset,
@@ -179,7 +179,7 @@ impl Editor {
         if self.term.size().width as usize > len {
             status.push_str(&" ".repeat(self.term.size().width as usize - len));
         }
-        status = format!("{}{}", status, line_indicator);
+        status = format!("{status}{line_indicator}");
         status.truncate(self.term.size().width as usize);
 
         self.term.write_line(
@@ -188,12 +188,12 @@ impl Editor {
                 y: self.term.size().height as usize,
             },
             status.black().on_grey().to_string(),
-            self.cursor.clone(),
-        )
+            self.cursor,
+        );
     }
 
     fn exit(&mut self) {
-        if let Ok(_) = self.term.exit() {
+        if self.term.exit().is_ok() {
             exit(0);
         }
     }

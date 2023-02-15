@@ -8,14 +8,17 @@ pub struct Line {
 }
 
 impl Line {
+    #[must_use]
     pub fn new(start: usize, end: usize, idx: usize) -> Self {
         Self { start, end, idx }
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
-        return self.end - self.start;
+        self.end - self.start
     }
 
+    #[must_use]
     pub fn index(&self) -> usize {
         self.idx
     }
@@ -30,7 +33,7 @@ pub struct Document {
 
 impl Document {
     pub fn open(filename: &str) -> Result<Self, Error> {
-        let mut data = fs::read(filename).expect("Não consegui abrir o arquivo");
+        let mut data = fs::read(filename)?;
         let lines = Document::get_lines(&mut data);
         Ok(Self {
             filename: Some(filename.to_string()),
@@ -44,7 +47,7 @@ impl Document {
         let mut prev: usize = 0;
         let mut next: usize;
         for (idx, value) in data.iter_mut().enumerate() {
-            if *value == '\n' as u8 {
+            if *value == b'\n' {
                 next = idx;
                 lines.push(Line::new(prev, next, lines.len()));
                 prev = next + 1;
@@ -54,22 +57,19 @@ impl Document {
         lines
     }
 
+    #[must_use]
     pub fn get_line(&self, index: usize) -> Option<Line> {
-        if let Some(l) = self.lines.get(index) {
-            Some(l.clone())
-        } else {
-            None
-        }
+        self.lines.get(index).map(std::clone::Clone::clone)
     }
 
+    #[must_use]
     pub fn get_str_line(&self, index: usize) -> Option<String> {
         if let Some(l) = self.lines.get(index) {
-            let line: String;
-            if l.idx < 9 {
-                line = format!("  {}", l.idx + 1);
+            let line: String = if l.idx < 9 {
+                format!("  {}", l.idx + 1)
             } else {
-                line = format!(" {}", l.idx + 1);
-            }
+                format!(" {}", l.idx + 1)
+            };
 
             Some(format!(
                 "{} {}",
@@ -81,22 +81,22 @@ impl Document {
         }
     }
 
+    #[must_use]
     pub fn get_index(&self, l: &Line) -> usize {
         l.idx
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 
+    #[must_use]
     pub fn has_at(&self, index: usize) -> bool {
-        if let Some(_) = self.lines.get(index) {
-            true
-        } else {
-            false
-        }
+        self.lines.get(index).is_some()
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.lines.len()
     }
