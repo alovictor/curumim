@@ -1,6 +1,8 @@
 use std::{fs, io::Error};
 
-#[derive(Default, Debug, Clone)]
+use crate::Position;
+
+#[derive(Default, Debug, Clone, Copy)]
 pub struct Line {
     start: usize,
     end: usize,
@@ -33,8 +35,8 @@ pub struct Document {
 
 impl Document {
     pub fn open(filename: &str) -> Result<Self, Error> {
-        let mut data = fs::read(filename)?;
-        let lines = Document::get_lines(&mut data);
+        let data = fs::read(filename)?;
+        let lines = Document::get_lines(&data);
         Ok(Self {
             filename: Some(filename.to_string()),
             data,
@@ -42,11 +44,11 @@ impl Document {
         })
     }
 
-    fn get_lines(data: &mut Vec<u8>) -> Vec<Line> {
+    fn get_lines(data: &Vec<u8>) -> Vec<Line> {
         let mut lines = Vec::new();
         let mut prev: usize = 0;
         let mut next: usize;
-        for (idx, value) in data.iter_mut().enumerate() {
+        for (idx, value) in data.iter().enumerate() {
             if *value == b'\n' {
                 next = idx;
                 lines.push(Line::new(prev, next, lines.len()));
@@ -74,7 +76,7 @@ impl Document {
             Some(format!(
                 "{} {}",
                 line,
-                String::from_utf8_lossy(&self.data[l.start..l.end])
+                String::from_utf8_lossy(&self.data[l.start..l.end]).trim_end()
             ))
         } else {
             None
@@ -99,5 +101,12 @@ impl Document {
     #[must_use]
     pub fn len(&self) -> usize {
         self.lines.len()
+    }
+
+    pub fn insert(&mut self, pos: Position, c: char) -> Result<(), Error> {
+        let l = self.lines[pos.y];
+        let index = l.start + pos.x;
+        self.data.insert(index, c as u8);
+        Ok(())
     }
 }
