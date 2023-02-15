@@ -18,7 +18,7 @@ pub struct Term {
 
 impl Term {
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(pad: usize) -> Self {
         let mut out = stdout();
         execute!(out, terminal::EnterAlternateScreen).unwrap();
         if !terminal::is_raw_mode_enabled().unwrap() {
@@ -66,7 +66,7 @@ impl Term {
         if self.move_cur(&Position { x: pos.x, y: pos.y }).is_ok()
             && self.clear_current_line().is_ok()
         {
-            print!("{string:#}");
+            print!("{string}");
         };
         self.move_cur(&curr_pos).unwrap();
     }

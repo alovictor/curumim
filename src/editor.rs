@@ -1,11 +1,9 @@
 use crossterm::{event::KeyModifiers, style::Stylize};
-use std::{
-    cmp::{max, min},
-    env,
-    process::exit,
-};
+use std::{cmp::min, env, process::exit};
 
 use crate::{Document, Key, Line, Position, Rect, Term};
+
+const PADDING: usize = 4;
 
 pub struct Editor {
     quit: bool,
@@ -26,9 +24,9 @@ impl Editor {
         } else {
             Document::default()
         };
-        let term = Term::new();
+        let term = Term::new(PADDING);
         let edit = Rect::new(
-            4,
+            PADDING,
             0,
             term.size().width as usize,
             term.size().height as usize - 1,
@@ -47,9 +45,9 @@ impl Editor {
     pub fn run(&mut self) {
         loop {
             if self.term.clear().is_ok() {
+                self.update();
                 self.refresh();
                 self.process_keys();
-                self.update();
             }
         }
     }
@@ -74,7 +72,7 @@ impl Editor {
 
     fn process_keys(&mut self) {
         let key = self.term.get_input().unwrap();
-        let pad = self.edit.tl.x;
+        let pad = PADDING;
 
         match key.modifiers {
             KeyModifiers::CONTROL => {
@@ -125,7 +123,36 @@ impl Editor {
                     self.cursor.y = min(self.edit.br.y, self.document.len() - 1);
                     self.cursor.x = self.edit.tl.x;
                 }
-                Key::Char(c) => self.document.insert(self.cursor.clone(), c).unwrap(),
+                Key::Char(c) => {
+                    self.document
+                        .insert(Position::new(self.cursor.x - pad, self.cursor.y), c)
+                        .unwrap();
+                    self.cursor.x += 1;
+                }
+                Key::Backspace => {
+                    if self.cursor.y == 0 {
+                        self.cursor.y -= 1;
+                        self.cursor.x = pad + self.document.get_line(self.cursor.y).unwrap().len();
+                    } else {
+                        self.cursor.x -= 1;
+                    }
+                    self.document
+                        .delete(Position::new(self.cursor.x - pad, self.cursor.y))
+                        .unwrap();
+                }
+                Key::Delete => {
+                    self.document
+                        .delete(Position::new(self.cursor.x - pad, self.cursor.y))
+                        .unwrap();
+                    self.cursor.x -= 1;
+                }
+                Key::Enter => {
+                    self.document
+                        .insert(Position::new(self.cursor.x - pad, self.cursor.y), '\n')
+                        .unwrap();
+                    self.cursor.x = 0 + pad;
+                    self.cursor.y += 1;
+                }
                 _ => (),
             },
             _ => (),
@@ -159,9 +186,16 @@ impl Editor {
     }
 
     fn draw_edit(&mut self) {
-        for line in 0..self.edit.br.y + 1 {
-            if let Some(string) = self.document.get_str_line(line + self.offset.y) {
-                self.draw_row(&Position { x: 0, y: line }, string);
+        for y in 0..self.edit.br.y + 1 {
+            if let Some(line) = self.document.get_line(y + self.offset.y) {
+                let mut string;
+                if y < 9 {
+                    string = format!("  {}", line.idx + 1)
+                } else {
+                    string = format!(" {}", line.idx + 1)
+                };
+                string = format!("{} {}", string, self.document.get_str_line(line.idx));
+                self.draw_row(&Position { x: 0, y }, string);
             }
         }
     }

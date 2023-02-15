@@ -6,7 +6,7 @@ use crate::Position;
 pub struct Line {
     start: usize,
     end: usize,
-    idx: usize,
+    pub idx: usize,
 }
 
 impl Line {
@@ -65,22 +65,9 @@ impl Document {
     }
 
     #[must_use]
-    pub fn get_str_line(&self, index: usize) -> Option<String> {
-        if let Some(l) = self.lines.get(index) {
-            let line: String = if l.idx < 9 {
-                format!("  {}", l.idx + 1)
-            } else {
-                format!(" {}", l.idx + 1)
-            };
-
-            Some(format!(
-                "{} {}",
-                line,
-                String::from_utf8_lossy(&self.data[l.start..l.end]).trim_end()
-            ))
-        } else {
-            None
-        }
+    pub fn get_str_line(&self, index: usize) -> String {
+        let l = self.lines.get(index).unwrap();
+        String::from_utf8_lossy(&self.data[l.start..l.end]).to_string()
     }
 
     #[must_use]
@@ -104,9 +91,31 @@ impl Document {
     }
 
     pub fn insert(&mut self, pos: Position, c: char) -> Result<(), Error> {
+        debug!("cursor position: {:?}", pos);
         let l = self.lines[pos.y];
-        let index = l.start + pos.x;
+        debug!("line to edit: {:?}", l);
+        let index = pos.x + self.data[..l.start].len();
+        debug!("index em document.data: {:?}", index);
+        debug!(
+            "document.data: {:?} - {:?}",
+            String::from_utf8(self.data.clone()),
+            self.len()
+        );
         self.data.insert(index, c as u8);
+        debug!(
+            "document.data: {:?} - {:?}",
+            String::from_utf8(self.data.clone()),
+            self.len()
+        );
+        self.lines = Document::get_lines(&self.data);
+        Ok(())
+    }
+
+    pub fn delete(&mut self, pos: Position) -> Result<(), Error> {
+        let l = self.lines[pos.y];
+        let index = pos.x + self.data[..l.start].len();
+        self.data.remove(index);
+        self.lines = Document::get_lines(&self.data);
         Ok(())
     }
 }
