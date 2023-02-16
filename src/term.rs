@@ -18,7 +18,7 @@ pub struct Term {
 
 impl Term {
     #[must_use]
-    pub fn new(pad: usize) -> Self {
+    pub fn new() -> Self {
         let mut out = stdout();
         execute!(out, terminal::EnterAlternateScreen).unwrap();
         if !terminal::is_raw_mode_enabled().unwrap() {

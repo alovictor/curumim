@@ -1,9 +1,27 @@
 use crossterm::{event::KeyModifiers, style::Stylize};
-use std::{cmp::min, env, process::exit};
+use std::{
+    cmp::min,
+    env,
+    process::exit,
+    time::{Duration, Instant},
+};
 
 use crate::{Document, Key, Line, Position, Rect, Term};
 
 const PADDING: usize = 4;
+
+struct StatusMessage {
+    text: String,
+    time: Instant,
+}
+impl StatusMessage {
+    fn from(message: String) -> Self {
+        Self {
+            time: Instant::now(),
+            text: message,
+        }
+    }
+}
 
 pub struct Editor {
     quit: bool,
@@ -13,18 +31,25 @@ pub struct Editor {
     document: Document,
     edit: Rect,
     term: Term,
+    status_message: StatusMessage,
 }
 
 impl Editor {
     pub fn new() -> Self {
+        let mut initial_status = String::from("HELP: Ctrl-Q = quit");
         let args: Vec<String> = env::args().collect();
         let document = if args.len() > 1 {
             let file_name = &args[1];
-            Document::open(file_name).unwrap_or_default()
+            if let Ok(doc) = Document::open(file_name) {
+                doc
+            } else {
+                initial_status = format!("ERR: Could not open file: {}", file_name);
+                Document::default()
+            }
         } else {
             Document::default()
         };
-        let term = Term::new(PADDING);
+        let term = Term::new();
         let edit = Rect::new(
             PADDING,
             0,
@@ -39,6 +64,7 @@ impl Editor {
             document,
             edit,
             term,
+            status_message: StatusMessage::from(initial_status),
         }
     }
 
@@ -75,11 +101,18 @@ impl Editor {
         let pad = PADDING;
 
         match key.modifiers {
-            KeyModifiers::CONTROL => {
-                if key.code == Key::Char('q') {
-                    self.quit = true;
+            KeyModifiers::CONTROL => match key.code {
+                Key::Char('q') => self.quit = true,
+                Key::Char('s') => {
+                    if self.document.save().is_ok() {
+                        self.status_message = StatusMessage::from(format!(
+                            "Arquivo salvo em: {:?}",
+                            self.document.filename.clone().unwrap()
+                        ));
+                    }
                 }
-            }
+                _ => (),
+            },
             KeyModifiers::NONE => match key.code {
                 Key::Up => {
                     if self.cursor.y > self.edit.tl.y {
@@ -130,11 +163,11 @@ impl Editor {
                     self.cursor.x += 1;
                 }
                 Key::Backspace => {
-                    if self.cursor.y == 0 {
+                    if self.cursor.x > self.edit.tl.x {
+                        self.cursor.x -= 1;
+                    } else if self.cursor.y > 0 {
                         self.cursor.y -= 1;
                         self.cursor.x = pad + self.document.get_line(self.cursor.y).unwrap().len();
-                    } else {
-                        self.cursor.x -= 1;
                     }
                     self.document
                         .delete(Position::new(self.cursor.x - pad, self.cursor.y))
@@ -144,7 +177,6 @@ impl Editor {
                     self.document
                         .delete(Position::new(self.cursor.x - pad, self.cursor.y))
                         .unwrap();
-                    self.cursor.x -= 1;
                 }
                 Key::Enter => {
                     self.document
@@ -189,10 +221,12 @@ impl Editor {
         for y in 0..self.edit.br.y + 1 {
             if let Some(line) = self.document.get_line(y + self.offset.y) {
                 let mut string;
-                if y < 9 {
+                if line.idx < 9 {
                     string = format!("  {}", line.idx + 1)
-                } else {
+                } else if line.idx < 99 {
                     string = format!(" {}", line.idx + 1)
+                } else {
+                    string = format!("{}", line.idx + 1)
                 };
                 string = format!("{} {}", string, self.document.get_str_line(line.idx));
                 self.draw_row(&Position { x: 0, y }, string);
@@ -212,14 +246,7 @@ impl Editor {
             filename.truncate(20);
         }
         status = filename.to_string();
-        let line_indicator = format!(
-            "{:?} / {:?} / {:?} / {} / {}",
-            self.edit.br.y + self.offset.y,
-            self.offset,
-            self.cursor,
-            self.edit.br.y,
-            self.document.len()
-        );
+        let line_indicator = format!("{} / {} ", self.current_line.idx + 1, self.document.len());
         let len = status.len() + line_indicator.len();
         if self.term.size().width as usize > len {
             status.push_str(&" ".repeat(self.term.size().width as usize - len));
@@ -235,6 +262,16 @@ impl Editor {
             status.black().on_grey().to_string(),
             self.cursor,
         );
+        if Instant::now() - self.status_message.time < Duration::new(5, 0) {
+            self.term.write_line(
+                &Position {
+                    x: 0,
+                    y: self.term.size().height as usize + 1,
+                },
+                self.status_message.text.clone(),
+                self.cursor.clone(),
+            );
+        }
     }
 
     fn exit(&mut self) {

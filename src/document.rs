@@ -1,4 +1,7 @@
-use std::{fs, io::Error};
+use std::{
+    fs::{self, File},
+    io::{Error, Write},
+};
 
 use crate::Position;
 
@@ -91,22 +94,9 @@ impl Document {
     }
 
     pub fn insert(&mut self, pos: Position, c: char) -> Result<(), Error> {
-        debug!("cursor position: {:?}", pos);
         let l = self.lines[pos.y];
-        debug!("line to edit: {:?}", l);
         let index = pos.x + self.data[..l.start].len();
-        debug!("index em document.data: {:?}", index);
-        debug!(
-            "document.data: {:?} - {:?}",
-            String::from_utf8(self.data.clone()),
-            self.len()
-        );
         self.data.insert(index, c as u8);
-        debug!(
-            "document.data: {:?} - {:?}",
-            String::from_utf8(self.data.clone()),
-            self.len()
-        );
         self.lines = Document::get_lines(&self.data);
         Ok(())
     }
@@ -116,6 +106,14 @@ impl Document {
         let index = pos.x + self.data[..l.start].len();
         self.data.remove(index);
         self.lines = Document::get_lines(&self.data);
+        Ok(())
+    }
+
+    pub fn save(&self) -> Result<(), Error> {
+        if let Some(filename) = &self.filename {
+            let mut file = File::create(filename)?;
+            file.write_all(self.data.as_slice())?;
+        }
         Ok(())
     }
 }
