@@ -4,7 +4,7 @@
 
 ## Backlog
 
-- testes p tudo
+- testes
 - rolagem de pagina funcionando :white_check_mark:
 - inserção de texto básica :white_check_mark:
 - salvar arquivos
