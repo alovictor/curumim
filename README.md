@@ -7,7 +7,7 @@
 - testes
 - rolagem de pagina funcionando :white_check_mark:
 - inserção de texto básica :white_check_mark:
-- salvar arquivos
+- salvar arquivos? ✅
 - pesquisa
 - atalhos de teclado
 
