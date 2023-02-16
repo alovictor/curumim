@@ -46,7 +46,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "editor"
+name = "curumim"
 version = "0.1.0"
 dependencies = [
  "crossterm",

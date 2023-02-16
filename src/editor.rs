@@ -1,4 +1,5 @@
 use crossterm::{event::KeyModifiers, style::Stylize};
+use log::debug;
 use std::{
     cmp::min,
     env,
@@ -30,31 +31,33 @@ pub struct Editor {
     current_line: Line,
     document: Document,
     edit: Rect,
+    bar: Rect,
     term: Term,
     status_message: StatusMessage,
 }
 
 impl Editor {
     pub fn new() -> Self {
-        let mut initial_status = String::from("HELP: Ctrl-Q = quit");
+        let initial_status = String::from("HELP: Ctrl-Q = quit | Ctrl-S = save");
         let args: Vec<String> = env::args().collect();
+        debug!("{:?} {:?}", args, args.len());
         let document = if args.len() > 1 {
-            let file_name = &args[1];
-            if let Ok(doc) = Document::open(file_name) {
-                doc
-            } else {
-                initial_status = format!("ERR: Could not open file: {}", file_name);
-                Document::default()
-            }
+            Document::open(&args[1]).unwrap()
         } else {
-            Document::default()
+            Document::new().unwrap()
         };
         let term = Term::new();
         let edit = Rect::new(
             PADDING,
             0,
             term.size().width as usize,
-            term.size().height as usize - 1,
+            term.size().height as usize,
+        );
+        let bar = Rect::new(
+            0,
+            term.size().height as usize,
+            term.size().width as usize,
+            term.size().height as usize + 1,
         );
         Editor {
             quit: false,
@@ -63,6 +66,7 @@ impl Editor {
             current_line: Line::new(0, 0, 0),
             document,
             edit,
+            bar,
             term,
             status_message: StatusMessage::from(initial_status),
         }
@@ -104,6 +108,9 @@ impl Editor {
             KeyModifiers::CONTROL => match key.code {
                 Key::Char('q') => self.quit = true,
                 Key::Char('s') => {
+                    if self.document.filename.is_none() {
+                        self.prompt("filename: ");
+                    }
                     if self.document.save().is_ok() {
                         self.status_message = StatusMessage::from(format!(
                             "Arquivo salvo em: {:?}",
@@ -196,12 +203,6 @@ impl Editor {
         if let Some(line) = self.document.get_line(self.cursor.y) {
             self.current_line = line
         }
-
-        // self.term.set_title("Aloalo".to_string());
-
-        // if !self.cursor.in_range(&self.edit) {
-        //     self.cursor = Position::from_rect(&self.edit);
-        // }
     }
 
     fn scroll(&mut self) {
@@ -218,7 +219,7 @@ impl Editor {
     }
 
     fn draw_edit(&mut self) {
-        for y in 0..self.edit.br.y + 1 {
+        for y in self.edit.tl.y..self.edit.br.y + 1 {
             if let Some(line) = self.document.get_line(y + self.offset.y) {
                 let mut string;
                 if line.idx < 9 {
@@ -239,38 +240,86 @@ impl Editor {
     }
 
     fn draw_bar(&mut self) {
-        let mut status;
         let mut filename = "[No Name]".to_string();
         if let Some(name) = &self.document.filename {
             filename = name.clone();
-            filename.truncate(20);
+            filename.truncate(20)
         }
-        status = filename.to_string();
         let line_indicator = format!("{} / {} ", self.current_line.idx + 1, self.document.len());
-        let len = status.len() + line_indicator.len();
-        if self.term.size().width as usize > len {
-            status.push_str(&" ".repeat(self.term.size().width as usize - len));
+        let len = filename.len() + line_indicator.len();
+        let mut status = String::new();
+        if self.bar.br.x > len {
+            status.push_str(&" ".repeat(self.bar.br.x - len));
         }
-        status = format!("{status}{line_indicator}");
-        status.truncate(self.term.size().width as usize);
+        status = format!("{filename}{status}{line_indicator}");
+        status.truncate(self.bar.br.x);
 
-        self.term.write_line(
-            &Position {
-                x: 0,
-                y: self.term.size().height as usize,
-            },
-            status.black().on_grey().to_string(),
-            self.cursor,
-        );
-        if Instant::now() - self.status_message.time < Duration::new(5, 0) {
-            self.term.write_line(
-                &Position {
-                    x: 0,
-                    y: self.term.size().height as usize + 1,
-                },
-                self.status_message.text.clone(),
-                self.cursor.clone(),
-            );
+        for y in self.bar.tl.y..self.bar.br.y + 1 {
+            if y == self.bar.tl.y {
+                self.term.write_line(
+                    &Position {
+                        x: self.bar.tl.x,
+                        y: self.bar.tl.y,
+                    },
+                    status.clone().black().on_grey().to_string(),
+                    self.cursor,
+                );
+            } else {
+                if Instant::now() - self.status_message.time < Duration::new(5, 0) {
+                    self.term.write_line(
+                        &Position {
+                            x: self.bar.tl.x,
+                            y: self.bar.tl.y + 1,
+                        },
+                        self.status_message.text.clone(),
+                        self.cursor.clone(),
+                    );
+                }
+            }
+        }
+    }
+
+    fn prompt(&mut self, prompt: &str) {
+        let last_cur_pos = self.cursor.clone();
+        let mut result = String::new();
+        self.cursor = Position::new(self.bar.tl.x + prompt.len(), self.bar.tl.y + 1);
+        loop {
+            self.status_message = StatusMessage::from(format!("{}{}", prompt, result));
+            self.refresh();
+            if let Ok(key) = self.term.get_input() {
+                match key.code {
+                    Key::Left => {
+                        if self.cursor.x > prompt.len() {
+                            self.cursor.x -= 1;
+                        }
+                    }
+                    Key::Right => {
+                        if self.cursor.x < prompt.len() + result.len() {
+                            self.cursor.x += 1;
+                        }
+                    }
+                    Key::Char(c) => {
+                        result.push(c);
+                        self.cursor.x += 1;
+                    }
+                    Key::Backspace => {
+                        result.pop();
+                        self.cursor.x -= 1;
+                    }
+                    Key::Delete => {
+                        if self.cursor.x < prompt.len() + result.len() {
+                            result.remove(self.cursor.x - prompt.len());
+                        }
+                    }
+                    Key::Enter => {
+                        self.status_message.text = String::new();
+                        self.cursor = last_cur_pos;
+                        self.document.filename = Some(result);
+                        break;
+                    }
+                    _ => (),
+                }
+            };
         }
     }
 

@@ -1,2 +1,2 @@
-/target
-./debug.log
+*.log
+target

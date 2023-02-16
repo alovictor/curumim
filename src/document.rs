@@ -1,6 +1,6 @@
 use std::{
     fs::{self, File},
-    io::{Error, Write},
+    io::{Error, ErrorKind, Write},
 };
 
 use crate::Position;
@@ -37,13 +37,27 @@ pub struct Document {
 }
 
 impl Document {
-    pub fn open(filename: &str) -> Result<Self, Error> {
-        let data = fs::read(filename)?;
-        let lines = Document::get_lines(&data);
+    pub fn open(filename: &String) -> Result<Self, Error> {
+        if let Ok(data) = fs::read(filename) {
+            let lines = Document::get_lines(&data);
+            Ok(Self {
+                filename: Some(filename.to_string()),
+                data,
+                lines,
+            })
+        } else {
+            Err(Error::new(
+                ErrorKind::Other,
+                "Não foi possível abrir o arquivo",
+            ))
+        }
+    }
+
+    pub fn new() -> Result<Self, Error> {
         Ok(Self {
-            filename: Some(filename.to_string()),
-            data,
-            lines,
+            filename: None,
+            data: Vec::new(),
+            lines: Vec::from([Line::new(0, 0, 0)]),
         })
     }
 
@@ -104,8 +118,10 @@ impl Document {
     pub fn delete(&mut self, pos: Position) -> Result<(), Error> {
         let l = self.lines[pos.y];
         let index = pos.x + self.data[..l.start].len();
-        self.data.remove(index);
-        self.lines = Document::get_lines(&self.data);
+        if index < self.data.len() {
+            self.data.remove(index);
+            self.lines = Document::get_lines(&self.data);
+        }
         Ok(())
     }
 
