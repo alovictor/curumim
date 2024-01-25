@@ -22,34 +22,34 @@ struct Args {
 
 fn main() -> CResult<()> {
     // logger
-    simple_logging::log_to_file("curumim.log", LevelFilter::Debug).unwrap();
+    simple_logging::log_to_file("curumim.log", LevelFilter::Debug)?;
 
     let args = Args::parse();
 
     // as duas structs principais do programa. São responsáveis por controlar o terminal e o editor, respectivamente
-    let mut term = Terminal::new();
+    let mut term = Terminal::new()?;
     let mut ed = Editor::new(args.file_path)?;
 
     // guardamos o buffer anterior para ver se houveram alterações, evitando flushs desnecessários
     // aproveitamentos para inicializar com a tela limpa e renderizamos logo em seguida
-    let prev_buf = term.init()?;
-    term.render(&prev_buf)?;
+    let mut prev_buf = term.init()?;
 
     // event loop
     loop {
-        let buf = update(&mut ed, &mut term)?;
-        term.render(&buf)?;
-
+        update_and_render(&mut prev_buf, &mut ed, &mut term)?;
+        
         match read().unwrap() {
             Event::Key(e) => {
                 if e.modifiers == KeyModifiers::CONTROL && e.code == KeyCode::Char('s') {
                     ed.save_file()?
+                } else if e.modifiers == KeyModifiers::CONTROL && e.code == KeyCode::Char('z') {
+                    ed.undo()?;
                 } else {
                     match e.code {
                         KeyCode::Esc => break,
-                        KeyCode::Char(c) => ed.insert_char(c)?,
-                        KeyCode::Backspace => ed.delete_char()?,
-                        KeyCode::Enter => ed.insert_char('\n')?,
+                        KeyCode::Char(c) => ed.insert(c)?,
+                        KeyCode::Backspace => ed.delete()?,
+                        KeyCode::Enter => ed.insert('\n')?,
                         KeyCode::Up => ed.move_cursor_v(-1),
                         KeyCode::Down => ed.move_cursor_v(1),
                         KeyCode::Left => ed.move_cursor_h(-1),
@@ -69,35 +69,43 @@ fn main() -> CResult<()> {
     Ok(())
 }
 
-fn update(ed: &mut Editor, term: &mut Terminal) -> CResult<CBuffer> {
-    let mut buf = Vec::default();
+fn update_and_render(prev_buf: &mut CBuffer, ed: &mut Editor, term: &mut Terminal) -> CResult<()> {
+    let mut buf = term.create_buffer();
     let size = term.get_size()?;
     let cpos = ed.get_cursor_pos()?;
+    let chars = ed.text.chars();
+    let mut line = 0;
 
-    for y in 0..size.1 {
-        if y < ed.len_lines()? {
-            let line = ed.get_line(y)?;
-            for x in 0..size.0 {
-                if let Some(c) = line.get_char(x) {
-                    if y == cpos.1 && x == cpos.0 {
-                        if c == '\n' {
-                            buf.push(Cell::new(" ".to_string(), Highlight::Cursor))
-                        } else {
-                            buf.push(Cell::new(c.to_string(), Highlight::Cursor))
-                        }
-                    } else {
-                        buf.push(Cell::new(c.to_string(), Highlight::Text))
-                    }
-                } else {
-                    buf.push(Cell::new(" ".to_string(), Highlight::Text))
-                }
-            }
+    for idx in 0..chars.len() + 1 {
+        let c = ed.get_char(idx)?;
+        let x = idx - ed.text.line_to_char(line);
+        let buf_id = x + line * size.0;
+
+        if c == '\n' {
+            line += 1;
         } else {
-            for _ in 0..size.0 {
-                buf.push(Cell::new(" ".to_string(), Highlight::Text))
-            }
+            buf[buf_id] = Cell::new(c.to_string(), Highlight::Text);
+        }
+
+        if idx == cpos {
+            buf[buf_id].style = Highlight::Cursor;
         }
     }
 
-    Ok(buf)
+    if check_buffers(&buf, &prev_buf) {
+        term.render(&buf)?;
+    }
+
+    Ok(())
+}
+
+// se os buffers forem diferentes retorna true
+// se os buffers forem iguais retorna false
+fn check_buffers(buf1: &CBuffer, buf2: &CBuffer) -> bool {
+    if buf1.len() == buf2.len() {
+        for i in 0..buf1.len() {
+            if buf1[i] != buf2[i] {return true}
+        }
+    }
+    false
 }

@@ -14,7 +14,7 @@ use crossterm::style::Color;
 
 use crate::prelude::*;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Highlight {
     Text,
     Cursor,
@@ -38,10 +38,10 @@ impl Highlight {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cell {
     pub symbol: String,
-    style: Highlight,
+    pub style: Highlight,
 }
 
 impl Cell {
@@ -59,27 +59,29 @@ pub struct Terminal {
 }
 
 impl Terminal {
-    pub fn new() -> Self {
-        let u16_size = terminal::size().unwrap();
+    pub fn new() -> CResult<Self> {
+        let u16_size = terminal::size()?;
         let size = (u16_size.0 as usize, u16_size.1 as usize);
-        Self {
+        Ok(Self {
             size,
             out: stdout(),
-        }
+        })
     }
 
     pub fn init(&mut self) -> CResult<CBuffer> {
         queue!(stdout(), EnterAlternateScreen)?;
         queue!(stdout(), Clear(ClearType::All))?;
         enable_raw_mode()?;
+        stdout().flush()?;
+        Ok(self.create_buffer())
+    }
 
+    pub fn create_buffer(&self) -> CBuffer {
         let mut buf = Vec::default();
         for _ in 0..self.size.0 * self.size.1 {
             buf.push(Cell::new(" ".to_string(), Highlight::Text))
         }
-
-        stdout().flush()?;
-        Ok(buf)
+        buf
     }
 
     pub fn render(&mut self, buf: &CBuffer) -> CResult<()> {
@@ -108,6 +110,7 @@ impl Terminal {
     }
 
     pub fn exit(&mut self) -> CResult<()> {
+        queue!(stdout(), Clear(ClearType::All))?;
         disable_raw_mode()?;
         queue!(stdout(), LeaveAlternateScreen)?;
         stdout().flush()?;
