@@ -9,13 +9,13 @@ Pequeno editor de texto em Rust usando Crossterm.
 
 ### 0.1
 
-    - [x] Abrir arquivos do sistema ou criar um novo
-    - [x] Movimentação do cursor
-    - [x] Undo
-    - [x] Salvar arquivos
-    - [ ] Número de linhas
+- [x] Abrir arquivos do sistema ou criar um novo
+- [x] Movimentação do cursor
+- [x] Undo
+- [x] Salvar arquivos
+- [ ] Número de linhas
 
 ### 0.2
 
-    - [ ] Ferramenta de pesquisa
-    - [ ] Syntax Highlight
+- [ ] Ferramenta de pesquisa
+- [ ] Syntax Highlight
